@@ -52,6 +52,30 @@
           <span id="smoothAlphaVal">0.30</span>
           <small class="hint">Applies exponential moving average to velocity and acceleration plots.</small>
         </div>
+        <div class="cv-settings">
+          <div class="row">
+            <label for="modelVariant">Model:</label>
+            <select id="modelVariant">
+              <option value="lite">Lite (fast)</option>
+              <option value="full" selected>Full (accurate)</option>
+            </select>
+            <label for="detectConf">Detect conf:</label>
+            <input id="detectConf" type="range" min="0" max="1" step="0.05" value="0.50" />
+            <span id="detectConfVal">0.50</span>
+            <label for="trackConf">Track conf:</label>
+            <input id="trackConf" type="range" min="0" max="1" step="0.05" value="0.50" />
+            <span id="trackConfVal">0.50</span>
+            <label for="lmSmooth">Joint smoothing:</label>
+            <input id="lmSmooth" type="range" min="0" max="0.9" step="0.05" value="0.20" />
+            <span id="lmSmoothVal">0.20</span>
+          </div>
+          <div class="row">
+            <label><input type="checkbox" id="autoCatch" checked /> Auto catch threshold</label>
+            <label for="catchThresh">Catch ≤</label>
+            <input id="catchThresh" type="number" min="70" max="140" step="1" value="110" />
+            <small class="hint">Lower means catch detected earlier (more compressed).</small>
+          </div>
+        </div>
         <div class="hints">
           <ul>
             <li>Use a true side profile, hip height if possible.</li>

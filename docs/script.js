@@ -42,6 +42,15 @@ const els = {
   remoteVideo: document.getElementById("remoteVideo"),
   smoothAlpha: document.getElementById("smoothAlpha"),
   smoothAlphaVal: document.getElementById("smoothAlphaVal"),
+  modelVariant: document.getElementById("modelVariant"),
+  detectConf: document.getElementById("detectConf"),
+  detectConfVal: document.getElementById("detectConfVal"),
+  trackConf: document.getElementById("trackConf"),
+  trackConfVal: document.getElementById("trackConfVal"),
+  lmSmooth: document.getElementById("lmSmooth"),
+  lmSmoothVal: document.getElementById("lmSmoothVal"),
+  autoCatch: document.getElementById("autoCatch"),
+  catchThresh: document.getElementById("catchThresh"),
 };
 
 let landmarker = null;
@@ -52,6 +61,16 @@ let scaleMetersPerPixel = null; // null means pixels
 let calibrateMode = false;
 let calibClicks = []; // [{x,y}] canvas pixel coords
 let smoothingAlpha = parseFloat(els.smoothAlpha?.value || '0.30');
+let landmarkAlpha = parseFloat(els.lmSmooth?.value || '0.20');
+let detectConf = parseFloat(els.detectConf?.value || '0.50');
+let trackConf = parseFloat(els.trackConf?.value || '0.50');
+let modelVariant = els.modelVariant?.value || 'full';
+let autoCatch = !!els.autoCatch?.checked;
+let manualCatchThresh = parseFloat(els.catchThresh?.value || '110');
+
+// Dynamic catch threshold window
+const kneeWindow = [];
+const kneeWindowSec = 8; // seconds of knee angle history
 
 // Stroke detection state
 let stroke = new StrokeState({ catchAngleMax: 110, smooth: 5 });
@@ -72,13 +91,18 @@ function chooseSide(wrists) {
 
 async function setupLandmarker() {
   const filesetResolver = await FilesetResolver.forVisionTasks(
-    // CDN hosting of WASM assets
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.7/wasm"
   );
+  const modelUrl = modelVariant === 'full'
+    ? "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task"
+    : "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task";
   landmarker = await PoseLandmarker.createFromOptions(filesetResolver, {
-    baseOptions: { modelAssetPath: MODEL_URL },
+    baseOptions: { modelAssetPath: modelUrl },
     runningMode: "VIDEO",
     numPoses: 1,
+    minPoseDetectionConfidence: detectConf,
+    minPosePresenceConfidence: detectConf,
+    minTrackingConfidence: trackConf,
   });
 }
 
@@ -105,16 +129,21 @@ function onResults(ts, results) {
     right: { hip: 24, knee: 26, ankle: 28, shoulder: 12 },
   }[side];
 
-  const hip = lm[idx.hip];
-  const knee = lm[idx.knee];
-  const ankle = lm[idx.ankle];
-  const shoulder = lm[idx.shoulder];
+  // Landmark smoothing (EMA on normalized coordinates)
+  const hip = smoothLm('hip', lm[idx.hip]);
+  const knee = smoothLm('knee', lm[idx.knee]);
+  const ankle = smoothLm('ankle', lm[idx.ankle]);
+  const shoulder = smoothLm('shoulder', lm[idx.shoulder]);
 
   const kneeAngle = angleAt(hip, knee, ankle);
   const backTilt = angleToVertical(hip, shoulder);
   const shinTilt = angleToVertical(ankle, knee);
 
-  stroke.update(ts / 1000, kneeAngle);
+  const tSec = ts / 1000;
+  updateKneeWindow(tSec, kneeAngle);
+  if (autoCatch) stroke.catchAngleMax = estimateCatchThreshold();
+  else stroke.catchAngleMax = manualCatchThresh;
+  stroke.update(tSec, kneeAngle);
   const summary = stroke.summary();
 
   // Update UI
@@ -523,4 +552,78 @@ if (els.smoothAlpha) {
     Object.values(plots).forEach(p => p.setAlpha(smoothingAlpha));
     updateSmoothLabel();
   });
+}
+
+// CV settings controls
+function bindRange(el, label, setter) {
+  if (!el) return;
+  const upd = () => { label.textContent = Number(el.value).toFixed(2); setter(parseFloat(el.value)); };
+  upd();
+  el.addEventListener('input', upd);
+}
+
+bindRange(els.detectConf, els.detectConfVal, (v) => { detectConf = v; recreateLandmarker(); });
+bindRange(els.trackConf, els.trackConfVal, (v) => { trackConf = v; recreateLandmarker(); });
+bindRange(els.lmSmooth, els.lmSmoothVal, (v) => { landmarkAlpha = v; });
+
+if (els.modelVariant) {
+  els.modelVariant.addEventListener('change', async () => {
+    modelVariant = els.modelVariant.value;
+    await recreateLandmarker();
+  });
+}
+
+if (els.autoCatch) {
+  const toggle = () => {
+    autoCatch = !!els.autoCatch.checked;
+    els.catchThresh.disabled = autoCatch;
+  };
+  toggle();
+  els.autoCatch.addEventListener('change', toggle);
+}
+if (els.catchThresh) {
+  const upd = () => { manualCatchThresh = parseFloat(els.catchThresh.value || '110'); };
+  upd();
+  els.catchThresh.addEventListener('input', upd);
+}
+
+async function recreateLandmarker() {
+  // Recreate landmarker with current options; keep running loop
+  landmarker = null;
+  await setupLandmarker();
+}
+
+// Landmark EMA smoother
+const lmPrev = {
+  shoulder: null, hip: null, knee: null, ankle: null, wrist: null,
+};
+function smoothLm(name, p) {
+  if (!p) return p;
+  const prev = lmPrev[name];
+  if (!prev) {
+    lmPrev[name] = { x: p.x, y: p.y };
+    return p;
+  }
+  const a = Math.max(0, Math.min(0.9, landmarkAlpha || 0));
+  const x = a * p.x + (1 - a) * prev.x;
+  const y = a * p.y + (1 - a) * prev.y;
+  lmPrev[name] = { x, y };
+  return { x, y };
+}
+
+function updateKneeWindow(t, angle) {
+  // Maintain windowed knee angles for dynamic thresholding
+  if (!Number.isFinite(angle)) return;
+  kneeWindow.push({ t, angle });
+  const tMin = t - kneeWindowSec;
+  while (kneeWindow.length && kneeWindow[0].t < tMin) kneeWindow.shift();
+}
+
+function estimateCatchThreshold() {
+  if (kneeWindow.length < 10) return manualCatchThresh;
+  let minA = Infinity, maxA = -Infinity;
+  for (const k of kneeWindow) { if (k.angle < minA) minA = k.angle; if (k.angle > maxA) maxA = k.angle; }
+  const range = Math.max(1, maxA - minA);
+  const thr = minA + 0.35 * range; // heuristic
+  return Math.max(70, Math.min(130, thr));
 }
