@@ -106,12 +106,37 @@ async function setupLandmarker() {
   });
 }
 
+function getContentRect() {
+  const cw = els.canvas.width;
+  const ch = els.canvas.height;
+  const vw = els.video.videoWidth || cw;
+  const vh = els.video.videoHeight || ch;
+  const s = Math.min(cw / vw, ch / vh);
+  const dw = vw * s;
+  const dh = vh * s;
+  const ox = (cw - dw) / 2;
+  const oy = (ch - dh) / 2;
+  return { ox, oy, s, vw, vh, dw, dh };
+}
+
+function adjustNormalizedLandmarksForCanvas(lms) {
+  const { ox, oy, s, vw, vh } = getContentRect();
+  // Map normalized video coords (0..1) to canvas normalized coords that include letterboxing offsets
+  return lms.map((p) => ({
+    x: (ox + (p.x * vw) * s) / els.canvas.width,
+    y: (oy + (p.y * vh) * s) / els.canvas.height,
+    z: p.z,
+    visibility: p.visibility,
+  }));
+}
+
 function drawResults(landmarks) {
   const ctx = els.canvas.getContext("2d");
   ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
   if (!landmarks || landmarks.length === 0) return;
   const utils = new DrawingUtils(ctx);
-  utils.drawLandmarks(landmarks[0], { color: "#52d1b8", lineWidth: 2, radius: 2 });
+  const adjusted = adjustNormalizedLandmarksForCanvas(landmarks[0]);
+  utils.drawLandmarks(adjusted, { color: "#52d1b8", lineWidth: 2, radius: 2 });
 }
 
 function onResults(ts, results) {
@@ -420,15 +445,14 @@ const motionState = {
 };
 
 function updateMotionGraphs(t, points) {
-  // points: {shoulder, hip, knee, ankle, wrist} where each has normalized x,y
-  // Convert to pixels based on canvas size for consistent scale
-  const w = els.canvas.width;
-  const h = els.canvas.height;
+  // points: {shoulder, hip, knee, ankle, wrist} normalized in video space (0..1)
+  // Convert to canvas pixels using letterboxing-aware transform
+  const { ox, oy, s, vw, vh } = getContentRect();
   const names = ["shoulder", "hip", "knee", "ankle", "wrist"];
   for (const name of names) {
     const p = points[name];
     if (!p) continue;
-    const pos = { x: p.x * w, y: p.y * h };
+    const pos = { x: ox + (p.x * vw) * s, y: oy + (p.y * vh) * s };
     const prev = motionState.prev[name];
     let vMag = 0, aMag = 0;
     if (prev) {
