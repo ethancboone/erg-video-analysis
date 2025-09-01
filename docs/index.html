@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Erg Video Analysis</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Erg Video Analysis</h1>
+      <p>All processing happens locally in your browser.</p>
+    </header>
+
+    <main>
+      <section class="controls">
+        <div class="buttons">
+          <button id="startWebcam">Start Webcam</button>
+          <button id="stopWebcam" disabled>Stop</button>
+          <label class="upload">
+            <input type="file" id="fileInput" accept="video/*" />
+            <span>Upload Video</span>
+          </label>
+        </div>
+        <div class="yt">
+          <input id="ytUrl" type="url" placeholder="Paste YouTube URL" />
+          <button id="openYt">Open Link</button>
+          <button id="captureTab">Start Tab Capture</button>
+          <small class="hint">Use Start Tab Capture and choose your YouTube tab in the picker. Processing stays local.</small>
+        </div>
+        <div class="calib">
+          <div class="row">
+            <label for="calibDist">Known distance:</label>
+            <input id="calibDist" type="number" step="0.01" value="1.0" />
+            <select id="calibUnits">
+              <option value="m" selected>m</option>
+              <option value="cm">cm</option>
+            </select>
+            <button id="calibrateBtn">Calibrate Scale</button>
+            <button id="resetCalib">Reset</button>
+          </div>
+          <small class="hint">Click two points on the video that are the given distance apart (e.g., seat rail length).</small>
+        </div>
+        <div class="hints">
+          <ul>
+            <li>Use a true side profile, hip height if possible.</li>
+            <li>Good lighting improves landmark detection.</li>
+            <li>No videos or frames are uploaded anywhere.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage">
+        <div class="video-wrap">
+          <video id="video" playsinline></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <aside class="metrics">
+          <h3>Metrics</h3>
+          <div id="metrics">
+            <div><b>Strokes:</b> <span id="mStrokes">0</span></div>
+            <div><b>SPM:</b> <span id="mSpm">0.0</span></div>
+            <div><b>Drive/Recovery:</b> <span id="mDrr">—</span></div>
+            <div><b>Back tilt (°):</b> <span id="mBack">—</span></div>
+            <div><b>Shin tilt (°):</b> <span id="mShin">—</span></div>
+            <div><b>Scale:</b> <span id="mScale">not set</span></div>
+          </div>
+          <h3>Graphs</h3>
+          <div class="graphs">
+            <div class="graph">
+              <label id="labelShoulder">Shoulder v/a</label>
+              <canvas id="gShoulder" width="260" height="90"></canvas>
+            </div>
+            <div class="graph">
+              <label id="labelHip">Hip v/a</label>
+              <canvas id="gHip" width="260" height="90"></canvas>
+            </div>
+            <div class="graph">
+              <label id="labelKnee">Knee v/a</label>
+              <canvas id="gKnee" width="260" height="90"></canvas>
+            </div>
+            <div class="graph">
+              <label id="labelAnkle">Ankle v/a</label>
+              <canvas id="gAnkle" width="260" height="90"></canvas>
+            </div>
+            <div class="graph">
+              <label id="labelWrist">Wrist v/a</label>
+              <canvas id="gWrist" width="260" height="90"></canvas>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="footer">
+        <p>
+          Powered by MediaPipe Pose. Source on GitHub.
+        </p>
+      </section>
+    </main>
+
+    <script type="module" src="./script.js"></script>
+  </body>
+  </html>
