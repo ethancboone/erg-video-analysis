@@ -36,6 +36,10 @@ main{max-width:1100px;margin:0 auto;padding:0 24px 48px}
 .yt input{width:280px;max-width:50vw;background:#0f1418;border:1px solid #22313a;border-radius:8px;color:var(--fg);padding:8px}
 .yt button{padding:8px 12px;border-radius:8px;border:1px solid #22313a;background:#142028;color:var(--fg);cursor:pointer}
 .yt .hint{display:block;color:var(--muted)}
+.direct-url{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.direct-url input{width:360px;max-width:60vw;background:#0f1418;border:1px solid #22313a;border-radius:8px;color:var(--fg);padding:8px}
+.direct-url button{padding:8px 12px;border-radius:8px;border:1px solid #22313a;background:#142028;color:var(--fg);cursor:pointer}
+.alert{background:#20131a;border:1px solid #6b2239;color:#ff9db7;padding:8px 10px;border-radius:8px;margin:8px 0}
 .calib{display:flex;flex-direction:column;gap:6px}
 .calib .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .calib input,.calib select{background:#0f1418;border:1px solid #22313a;border-radius:8px;color:var(--fg);padding:8px}

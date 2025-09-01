@@ -28,6 +28,11 @@
           <button id="captureTab">Start Tab Capture</button>
           <small class="hint">Use Start Tab Capture and choose your YouTube tab in the picker. Processing stays local.</small>
         </div>
+        <div class="direct-url">
+          <input id="directUrl" type="url" placeholder="Direct video URL (mp4, webm)" />
+          <button id="loadUrl">Load URL</button>
+          <small class="hint">Must allow CORS (Access-Control-Allow-Origin). YouTube links do not work here.</small>
+        </div>
         <div class="calib">
           <div class="row">
             <label for="calibDist">Known distance:</label>
@@ -54,8 +59,10 @@
         <div class="video-wrap">
           <video id="video" playsinline></video>
           <canvas id="overlay"></canvas>
+          <video id="remoteVideo" playsinline style="display:none"></video>
         </div>
         <aside class="metrics">
+          <div id="alert" class="alert" style="display:none"></div>
           <h3>Metrics</h3>
           <div id="metrics">
             <div><b>Strokes:</b> <span id="mStrokes">0</span></div>

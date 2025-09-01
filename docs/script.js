@@ -16,6 +16,8 @@ const els = {
   ytUrl: document.getElementById("ytUrl"),
   openYt: document.getElementById("openYt"),
   captureTab: document.getElementById("captureTab"),
+  directUrl: document.getElementById("directUrl"),
+  loadUrl: document.getElementById("loadUrl"),
   mStrokes: document.getElementById("mStrokes"),
   mSpm: document.getElementById("mSpm"),
   mDrr: document.getElementById("mDrr"),
@@ -36,6 +38,8 @@ const els = {
   calibDist: document.getElementById("calibDist"),
   calibUnits: document.getElementById("calibUnits"),
   mScale: document.getElementById("mScale"),
+  alert: document.getElementById("alert"),
+  remoteVideo: document.getElementById("remoteVideo"),
 };
 
 let landmarker = null;
@@ -175,6 +179,58 @@ async function handleFile(file) {
   requestAnimationFrame(loop);
 }
 
+async function handleDirectUrl(url) {
+  if (!landmarker) await setupLandmarker();
+  resetState();
+  videoSource = "url";
+  clearAlert();
+  try {
+    els.remoteVideo.crossOrigin = "anonymous";
+    els.remoteVideo.srcObject = null;
+    els.remoteVideo.src = url;
+    await els.remoteVideo.play();
+    // Try to test CORS by drawing a frame to an offscreen canvas and reading back
+    const testOk = await testFrameReadable(els.remoteVideo);
+    if (!testOk) {
+      showAlert("Could not analyze: cross-origin video without CORS. Please use Upload Video or Tab Capture.");
+      els.remoteVideo.pause();
+      els.remoteVideo.removeAttribute('src');
+      els.remoteVideo.load();
+      return;
+    }
+    // If readable, pipe the capture stream to our visible <video>
+    const stream = els.remoteVideo.captureStream?.() || els.remoteVideo.mozCaptureStream?.();
+    if (!stream) {
+      showAlert("Browser does not support captureStream for media elements.");
+      return;
+    }
+    els.video.srcObject = stream;
+    await els.video.play();
+    resizeCanvas();
+    running = true;
+    requestAnimationFrame(loop);
+  } catch (e) {
+    console.warn("Direct URL load failed", e);
+    showAlert("Failed to load or play the URL. Ensure it is a direct video link (mp4/webm) with CORS enabled.");
+  }
+}
+
+async function testFrameReadable(videoEl) {
+  return new Promise((resolve) => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = Math.max(2, Math.floor(videoEl.videoWidth / 10));
+      c.height = Math.max(2, Math.floor(videoEl.videoHeight / 10));
+      const ctx = c.getContext('2d');
+      ctx.drawImage(videoEl, 0, 0, c.width, c.height);
+      ctx.getImageData(0, 0, 1, 1);
+      resolve(true);
+    } catch (e) {
+      resolve(false);
+    }
+  });
+}
+
 async function loop() {
   if (!running || !landmarker) return;
   if (els.video.readyState < 2) {
@@ -193,6 +249,10 @@ els.stopBtn.addEventListener("click", stopWebcam);
 els.fileInput.addEventListener("change", (e) => {
   const f = e.target.files?.[0];
   if (f) handleFile(f);
+});
+els.loadUrl.addEventListener("click", () => {
+  const url = els.directUrl.value.trim();
+  if (url) handleDirectUrl(url);
 });
 
 // --- YouTube helpers (tab capture) ---
@@ -426,3 +486,12 @@ els.calibrateBtn.addEventListener("click", startCalibration);
 els.resetCalib.addEventListener("click", resetCalibration);
 els.canvas.addEventListener("click", canvasClickForCalibration);
 updateScaleLabel();
+
+function showAlert(msg) {
+  els.alert.textContent = msg;
+  els.alert.style.display = 'block';
+}
+function clearAlert() {
+  els.alert.textContent = '';
+  els.alert.style.display = 'none';
+}
