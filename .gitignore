@@ -1,0 +1,21 @@
+# Ignore large media files and local artifacts
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.flac
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+

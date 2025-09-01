@@ -40,6 +40,8 @@ const els = {
   mScale: document.getElementById("mScale"),
   alert: document.getElementById("alert"),
   remoteVideo: document.getElementById("remoteVideo"),
+  smoothAlpha: document.getElementById("smoothAlpha"),
+  smoothAlphaVal: document.getElementById("smoothAlphaVal"),
 };
 
 let landmarker = null;
@@ -49,6 +51,7 @@ let ytWindow = null;
 let scaleMetersPerPixel = null; // null means pixels
 let calibrateMode = false;
 let calibClicks = []; // [{x,y}] canvas pixel coords
+let smoothingAlpha = parseFloat(els.smoothAlpha?.value || '0.30');
 
 // Stroke detection state
 let stroke = new StrokeState({ catchAngleMax: 110, smooth: 5 });
@@ -297,7 +300,8 @@ class MotionPlot {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.windowSec = opts.windowSec ?? 10; // show last N seconds
-    this.samples = []; // {t, v, a}
+    this.samples = []; // raw samples: {t, v, a}
+    this.alpha = opts.alpha ?? smoothingAlpha; // EMA smoothing factor
   }
   push(t, v, a) {
     this.samples.push({ t, v, a });
@@ -305,6 +309,7 @@ class MotionPlot {
     while (this.samples.length && this.samples[0].t < tMin) this.samples.shift();
     this.draw();
   }
+  setAlpha(alpha) { this.alpha = alpha; this.draw(); }
   draw() {
     const { ctx, canvas } = this;
     const w = canvas.width, h = canvas.height;
@@ -324,18 +329,32 @@ class MotionPlot {
     const t0 = this.samples[0].t;
     const t1 = this.samples[this.samples.length - 1].t;
     const dt = Math.max(1e-3, t1 - t0);
+    // Compute EMA-smoothed series for v and a
+    const alpha = Math.max(0, Math.min(0.95, this.alpha ?? 0));
+    const vSmooth = [];
+    const aSmooth = [];
+    let vE = this.samples[0].v;
+    let aE = this.samples[0].a;
+    for (let i = 0; i < this.samples.length; i++) {
+      const s = this.samples[i];
+      vE = alpha * s.v + (1 - alpha) * vE;
+      aE = alpha * s.a + (1 - alpha) * aE;
+      vSmooth.push({ t: s.t, y: vE });
+      aSmooth.push({ t: s.t, y: aE });
+    }
     let maxVal = 1e-3;
-    for (const s of this.samples) maxVal = Math.max(maxVal, s.v, s.a);
+    for (const s of vSmooth) maxVal = Math.max(maxVal, Math.abs(s.y));
+    for (const s of aSmooth) maxVal = Math.max(maxVal, Math.abs(s.y));
     const pad = 4;
     const sx = (x) => pad + ((x - t0) / dt) * (w - 2 * pad);
     const sy = (y) => h - pad - (y / maxVal) * (h - 2 * pad);
     // Velocity in teal
     ctx.strokeStyle = "#52d1b8";
     ctx.beginPath();
-    for (let i = 0; i < this.samples.length; i++) {
-      const s = this.samples[i];
+    for (let i = 0; i < vSmooth.length; i++) {
+      const s = vSmooth[i];
       const x = sx(s.t);
-      const y = sy(s.v);
+      const y = sy(s.y);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
@@ -343,10 +362,10 @@ class MotionPlot {
     // Acceleration in purple
     ctx.strokeStyle = "#b87cff";
     ctx.beginPath();
-    for (let i = 0; i < this.samples.length; i++) {
-      const s = this.samples[i];
+    for (let i = 0; i < aSmooth.length; i++) {
+      const s = aSmooth[i];
       const x = sx(s.t);
-      const y = sy(s.a);
+      const y = sy(s.y);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
@@ -355,11 +374,11 @@ class MotionPlot {
 }
 
 const plots = {
-  shoulder: new MotionPlot(els.gShoulder),
-  hip: new MotionPlot(els.gHip),
-  knee: new MotionPlot(els.gKnee),
-  ankle: new MotionPlot(els.gAnkle),
-  wrist: new MotionPlot(els.gWrist),
+  shoulder: new MotionPlot(els.gShoulder, { alpha: smoothingAlpha }),
+  hip: new MotionPlot(els.gHip, { alpha: smoothingAlpha }),
+  knee: new MotionPlot(els.gKnee, { alpha: smoothingAlpha }),
+  ankle: new MotionPlot(els.gAnkle, { alpha: smoothingAlpha }),
+  wrist: new MotionPlot(els.gWrist, { alpha: smoothingAlpha }),
 };
 
 const motionState = {
@@ -494,4 +513,14 @@ function showAlert(msg) {
 function clearAlert() {
   els.alert.textContent = '';
   els.alert.style.display = 'none';
+}
+// Smoothing control
+if (els.smoothAlpha) {
+  const updateSmoothLabel = () => { els.smoothAlphaVal.textContent = Number(els.smoothAlpha.value).toFixed(2); };
+  updateSmoothLabel();
+  els.smoothAlpha.addEventListener('input', () => {
+    smoothingAlpha = parseFloat(els.smoothAlpha.value || '0');
+    Object.values(plots).forEach(p => p.setAlpha(smoothingAlpha));
+    updateSmoothLabel();
+  });
 }

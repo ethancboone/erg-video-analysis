@@ -44,6 +44,8 @@ main{max-width:1100px;margin:0 auto;padding:0 24px 48px}
 .calib .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .calib input,.calib select{background:#0f1418;border:1px solid #22313a;border-radius:8px;color:var(--fg);padding:8px}
 .calib button{padding:8px 12px;border-radius:8px;border:1px solid #22313a;background:#142028;color:var(--fg);cursor:pointer}
+.smoothing{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.smoothing input[type=range]{width:200px}
 .hints ul{margin:0;padding-left:16px;color:var(--muted)}
 
 .stage{display:flex;gap:16px}

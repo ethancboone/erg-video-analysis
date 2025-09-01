@@ -46,6 +46,12 @@
           </div>
           <small class="hint">Click two points on the video that are the given distance apart (e.g., seat rail length).</small>
         </div>
+        <div class="smoothing">
+          <label for="smoothAlpha">Graph smoothing:</label>
+          <input id="smoothAlpha" type="range" min="0" max="0.95" step="0.05" value="0.30" />
+          <span id="smoothAlphaVal">0.30</span>
+          <small class="hint">Applies exponential moving average to velocity and acceleration plots.</small>
+        </div>
         <div class="hints">
           <ul>
             <li>Use a true side profile, hip height if possible.</li>
