@@ -25,13 +25,23 @@ export function angleToVertical(p1, p2) {
 }
 
 export class StrokeState {
-  constructor({ catchAngleMax = 110, smooth = 5 } = {}) {
+  constructor({
+    catchAngleMax = 110,
+    smooth = 5,
+    minCatchIntervalSec = 0.9,
+    confirmFrames = 2,
+    windowSize = 9,
+  } = {}) {
     this.catchAngleMax = catchAngleMax;
     this.smooth = Math.max(1, smooth);
+    this.minCatchIntervalSec = minCatchIntervalSec;
+    this.confirmFrames = Math.max(1, confirmFrames);
+    this.windowSize = Math.max(3, windowSize);
     this.angles = []; // {t, a}
     this.deriv = []; // {t, d}
     this.catches = [];
     this.finishes = [];
+    this._posStreak = 0;
   }
 
   smoothedAngle() {
@@ -51,14 +61,44 @@ export class StrokeState {
       this.deriv.push({ t, d: (angle - a0) / dt });
     }
 
+    if (this.deriv.length >= 1) {
+      const { d: dNow } = this.deriv[this.deriv.length - 1];
+      this._posStreak = dNow >= 0 ? this._posStreak + 1 : 0;
+    }
+
     if (this.deriv.length >= 2) {
       const { d: dPrev } = this.deriv[this.deriv.length - 2];
       const { d: dNow } = this.deriv[this.deriv.length - 1];
       const sm = this.smoothedAngle();
-      if (sm != null && dPrev < 0 && dNow >= 0 && sm <= this.catchAngleMax) {
-        if (this.catches.length === 0 || t - this.catches[this.catches.length - 1] > 0.5) {
-          this.catches.push(t);
-        }
+      const lastCatchOk =
+        this.catches.length === 0 ||
+        t - this.catches[this.catches.length - 1] > this.minCatchIntervalSec;
+
+      if (
+        sm != null &&
+        dPrev < 0 && dNow >= 0 &&
+        sm <= this.catchAngleMax &&
+        lastCatchOk &&
+        this._posStreak >= this.confirmFrames &&
+        this._isLocalMin()
+      ) {
+        this.catches.push(t);
+      }
+    }
+
+    // Fallback: if derivative is too noisy, accept strict local minima under threshold
+    // using only windowed check and min interval.
+    const sm2 = this.smoothedAngle();
+    if (
+      sm2 != null &&
+      sm2 <= this.catchAngleMax &&
+      this._isLocalMin() &&
+      (this.catches.length === 0 || t - this.catches[this.catches.length - 1] > this.minCatchIntervalSec)
+    ) {
+      // Prevent double add within the same frame cycle
+      const last = this.catches[this.catches.length - 1];
+      if (!(last && Math.abs(last - t) < 1e-3)) {
+        this.catches.push(t);
       }
     }
 
@@ -72,6 +112,19 @@ export class StrokeState {
         }
       }
     }
+  }
+
+  _isLocalMin() {
+    if (this.angles.length < this.windowSize) return false;
+    const end = this.angles.length - 1;
+    const start = Math.max(0, end - this.windowSize + 1);
+    let minA = Infinity;
+    let minIdx = -1;
+    for (let i = start; i <= end; i++) {
+      const a = this.angles[i].a;
+      if (a < minA) { minA = a; minIdx = i; }
+    }
+    return minIdx === end;
   }
 
   summary() {
@@ -105,4 +158,3 @@ export class StrokeState {
     return { strokes, spm, drr };
   }
 }
-

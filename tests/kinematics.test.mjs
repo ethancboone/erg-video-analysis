@@ -18,7 +18,7 @@ test('angleToVertical vertical vector = 0 deg', () => {
 });
 
 test('StrokeState detects approximate SPM', () => {
-  const st = new StrokeState({ catchAngleMax: 110, smooth: 3 });
+  const st = new StrokeState({ catchAngleMax: 110, smooth: 3, minCatchIntervalSec: 0.4, confirmFrames: 1, windowSize: 7 });
   // Simulate a sinusoidal knee angle (in degrees) around 100..160
   // Period ~ 1.5s -> ~40 SPM
   let t = 0;

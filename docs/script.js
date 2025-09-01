@@ -73,7 +73,7 @@ const kneeWindow = [];
 const kneeWindowSec = 8; // seconds of knee angle history
 
 // Stroke detection state
-let stroke = new StrokeState({ catchAngleMax: 110, smooth: 5 });
+let stroke = new StrokeState({ catchAngleMax: 110, smooth: 7, minCatchIntervalSec: 0.9, confirmFrames: 3, windowSize: 9 });
 
 function resetState() {
   stroke = new StrokeState({ catchAngleMax: 110, smooth: 5 });
